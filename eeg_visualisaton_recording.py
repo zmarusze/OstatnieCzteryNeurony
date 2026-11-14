@@ -109,9 +109,9 @@ if __name__ == "__main__":
     p.connect(epocher_left, scope_left)
 
     app.add_widget(scope)
-    app.add_widget(scope_rest)
-    app.add_widget(scope_right)
-    app.add_widget(scope_left)
+    #app.add_widget(scope_rest)
+    #app.add_widget(scope_right)
+    #app.add_widget(scope_left)
 
     p.start()
     
