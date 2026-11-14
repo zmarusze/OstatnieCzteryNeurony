@@ -70,23 +70,17 @@ if __name__ == "__main__":
     epocher_left = gp.Trigger(time_pre=PRE_S, time_post=MI_LEN_S)  
 
 
-    scope = gp.TimeSeriesScope(
-        time_window=10,
-        markers=[
-            gp.TimeSeriesScope.Markers(
-                color=color, label=label, channel=N_EEG_CHANNELS, value=code
-            )
-            for code, (label, color) in MARKER_STYLE.items()
-        ],
-    )
+    scope = gp.TimeSeriesScope(time_window=10,
+                               markers=[
+                               gp.TimeSeriesScope.Markers(
+                               color=color, label=label, channel=N_EEG_CHANNELS, value=code)
+                               for code, (label, color) in MARKER_STYLE.items()])
     
     scope_rest = gp.TriggerScope(amplitude_limit=EPOCH_AMPLITUDE_LIMIT)
     scope_right = gp.TriggerScope(amplitude_limit=EPOCH_AMPLITUDE_LIMIT)
     scope_left = gp.TriggerScope(amplitude_limit=EPOCH_AMPLITUDE_LIMIT)
 
-    eeg_writer = gp.EDFWriter(
-        file_name=f"{output_dir}/{FILE_PREFIX}_{session_str}_eeg.edf", timestamp=False
-    )
+    eeg_writer = gp.EDFWriter(file_name=f"{output_dir}/{FILE_PREFIX}_{session_str}_eeg.edf", timestamp=False)
     csv_filename = f"{output_dir}/{FILE_PREFIX}_{session_str}_markers.csv"
 
 
