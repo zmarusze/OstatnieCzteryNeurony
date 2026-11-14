@@ -4,7 +4,7 @@ import sys
 
 print("Installing dependencies...")
 subprocess.check_call(
-    [sys.executable, "-m", "pip", "install", "--upgrade", "mne", "gpype[all]", "gpype[devices]"]
+    [sys.executable, "-m", "pip", "install", "--upgrade", "mne", "psychopy", "psylsl", "gpype[all]", "gpype[devices, gui]"]
 )
 print("Done! All dependencies are installed.")
 
