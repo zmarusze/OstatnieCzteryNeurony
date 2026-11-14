@@ -176,15 +176,15 @@ backing_track = {
 
 class DashboardApp:
 
-  def __init__(self, sound_dict=piano, image_dict=piano_im):
+  def __init__(self, sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track):
     # Konfiguracja ścieżek
-    self.base_dir = "."
+    self.base_dir = os.path.dirname(os.path.abspath(__file__))
     self.images_dir = os.path.join(self.base_dir, "images")
     self.sounds_dir = os.path.join(self.base_dir, "sound_files")
 
     self.sound_dict = sound_dict
     self.image_dict = image_dict
-
+    self.backing_track_dict = backing_track_dict
     # Wczytanie obrazka domyślnego (klucz 0)
     default_img_name = self.image_dict.get(0, "piano-none.png")
     self.default_img_path = os.path.join(self.images_dir, default_img_name)
@@ -247,6 +247,27 @@ class DashboardApp:
     # 3. Ustawienie czasu powrotu do stanu domyślnego
     self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
 
+    def trigger_event_with_backing_track(self, number, duration_ms=3000):
+        """Wywołuje trigger_event i odtwarza backing track w tle."""
+        if number not in self.backing_track_dict and number in self.sound_dict and number in self.image_dict:
+          self.trigger_event(number, duration_ms)
+        # Odtwarzanie backing track w tle
+        backing_track_name = self.backing_track_dict.get(number)
+        if backing_track_name:
+            backing_track_path = os.path.join(self.sounds_dir, backing_track_name)
+            if os.path.exists(backing_track_path):
+                try:
+                    backing_sound = pygame.mixer.Sound(backing_track_path)
+                    channel = pygame.mixer.find_channel()
+                    if channel:
+                        channel.play(backing_sound)
+                    else:
+                        backing_sound.play()
+                except Exception as e:
+                    print(f"Błąd odtwarzania backing track {backing_track_path}: {e}")
+            else:
+                print(f"Brak pliku backing track: {backing_track_path}")
+
   def update(self):
     """Sprawdza, czy minął czas wyświetlania obrazka i wraca do domyślnego."""
     if (
@@ -267,7 +288,7 @@ class DashboardApp:
 
 
 def main():
-  app = DashboardApp(sound_dict=piano, image_dict=piano_im)
+  app = DashboardApp(sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track)
   running = True
 
   # --- Symulacja sekwencji uruchomienia (odpowiednik root.after w Tkinter) ---
@@ -277,15 +298,15 @@ def main():
   # Zaplanowanie testowych wywołań (identycznych jak Twoja pętla)
   # Pierwsza pętla: 1 do 8 co 1000ms
   for note in range(1, 9):
-    delay_ms = note * 1000
+    delay_ms = note * 4000
     pygame.time.set_timer(
         TIMED_EVENT_START + note, delay_ms, 1
     )  # Jednorazowy timer
 
   # Druga pętla: 8 do 1 od 9000ms
-  base_delay = 8000
+  base_delay = 32000  # 8 sekund + 1 sekunda buforu
   for idx, note in enumerate(range(8, 0, -1)):
-    delay_ms = base_delay + ((idx + 1) * 1000)
+    delay_ms = base_delay + ((idx + 1) * 4000)
     pygame.time.set_timer(TIMED_EVENT_START + 100 + note, delay_ms, 1)
 
   print("Aplikacja Pygame uruchomiona. Zamykanie okna przerywa działanie.")
