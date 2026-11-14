@@ -10,14 +10,14 @@ def play_sound(instrument, note):
     pygame.mixer.music.play(loops=0)
     while pygame.mixer.music.get_busy():
         pygame.time.wait(100)
-intrument = violin
+instrument = violin
 note = 0
 while True:
-    play_sound(intrument, note)
+    play_sound(instrument, note)
     note += 1
     if note > 7:
         note = 0
-        if intrument == violin:
-            intrument = piano
+        if instrument == violin:
+            instrument = piano
         else:
-            intrument = violin
+            instrument = violin
