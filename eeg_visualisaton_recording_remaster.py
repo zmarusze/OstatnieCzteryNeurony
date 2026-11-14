@@ -1,8 +1,9 @@
 import threading
 import gpype as gp
 from utils import pump_markers
+from mu_processing import MuProcessor
 
-USE_REAL_DEVICE = True  
+USE_REAL_DEVICE = False
 DEVICE_SERIAL = "UN-2024.12.02"  
 TEST_SIGNAL = False 
 
@@ -32,9 +33,20 @@ if __name__ == "__main__":
     bandpass = gp.Bandpass(f_lo=1, f_hi=40) 
     notch50 = gp.Bandstop(f_lo=48, f_hi=52)
 
-    trigger = gp.Trigger(time_pre=0.1, time_post=4, target=[1,2,3]) #type:ignore
+    trigger = gp.Trigger(time_pre=0.1, time_post=4, target=[1,2,3])
     baseline = gp.Baseline()
     collector = gp.Collector()
+   
+    mu_processor = MuProcessor(
+        channel_labels=CHANNEL_LABELS,
+        pre_trigger_seconds=0.1,
+        window_seconds=4.0,
+        calibration_seconds=160.0
+    )
+   
+    epoch_scope = gp.TriggerScope(
+        title="Epoched EEG (All Conditions)"
+    )
     # ---------------------------------------------------------
 
     merge_prep = gp.Router(input_channels={"eeg": gp.Router.ALL, "mrk": gp.Router.ALL})
@@ -53,7 +65,8 @@ if __name__ == "__main__":
     p.connect(notch50, trigger)
     p.connect(marker, trigger[gp.Trigger.PORT_TRIGGER])
     p.connect(trigger, baseline)
-    p.connect(baseline, collector)
+    p.connect(baseline, mu_processor)
+    p.connect(baseline, epoch_scope)
 
     p.connect(notch50, merge_vis["eeg"])
     p.connect(marker, merge_vis["mrk"])

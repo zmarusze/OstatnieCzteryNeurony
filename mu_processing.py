@@ -1,42 +1,28 @@
 import csv
 import os
+import math
 
 import numpy as np
 import scipy.signal as sp
-
 import gpype as gp
-
 
 KEYS = gp.Constants.Keys
 PORT_IN = gp.Constants.Defaults.PORT_IN
 
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
 MU_LOW = 8.0
 MU_HIGH = 12.0
-
 FILTER_ORDER = 4
 
-WINDOW_SECONDS = 0.5
-
-CALIBRATION_SECONDS = 300.0
-
+WINDOW_SECONDS = 4
+PRE_TRIGGER_SECS = 0.1 #MUST MATCH TRIGGER IN EEG REMASTER
+CALIBRATION_SECONDS = 160.0
 N_BINS = 8
-
 C3_CHANNEL = "C3"
 
 OUTPUT_FILE = os.path.join(
     "outputs",
     "mu_features.csv"
 )
-
-
-# ============================================================
-# REAL-TIME MU PROCESSING SINK
-# ============================================================
 
 class MuProcessor(gp.Sink):
 
@@ -45,13 +31,14 @@ class MuProcessor(gp.Sink):
         channel_labels,
         calibration_seconds=CALIBRATION_SECONDS,
         window_seconds=WINDOW_SECONDS,
+        pre_trigger_secs=PRE_TRIGGER_SECS,
         output_file=OUTPUT_FILE,
         **kwargs
     ):
 
         input_ports = kwargs.pop(
             KEYS.INPUT_PORTS,
-            [gp.IPort.Configuration()]
+            [gp.IPort.Configuration(name=PORT_IN, timing=gp.Constants.Timing.ASYNC)]
         )
 
         super().__init__(
@@ -63,25 +50,23 @@ class MuProcessor(gp.Sink):
 
         self.calibration_seconds = calibration_seconds
         self.window_seconds = window_seconds
+        self.pre_trigger_secs = pre_trigger_secs
 
         self.output_file = output_file
 
         self.fs = None
         self.window_samples = None
+        self.pre_trigger_samples = None
 
         self.sos = None
-        self.zi = None
 
-        self.buffer = None
-
+        self.epochs_received = 0
         self.samples_received = 0
-        self.windows_received = 0
 
-        self.calibration_windows = None
-        self.calibration_values = {}
+        self.calibration_epochs = None
+        self.calibration_values = None
 
         self.bin_edges = {}
-
         self.calibrated = False
 
         self.csv_file = None
@@ -101,10 +86,6 @@ class MuProcessor(gp.Sink):
             "average_signal_psd"
         ]
 
-
-    # ========================================================
-    # SETUP
-    # ========================================================
 
     def setup(self, data, port_context_in):
 
@@ -132,13 +113,18 @@ class MuProcessor(gp.Sink):
             round(self.fs * self.window_seconds)
         )
 
-        self.calibration_windows = int(
-            round(self.calibration_seconds / self.window_seconds)
+        self.pre_trigger_samples = int(
+            round(self.fs * self.pre_trigger_secs)
+        )
+
+        self.calibration_epochs = int(
+            math.ceil(
+                self.calibration_seconds
+                / self.window_seconds
+            )
         )
 
         # Fourth-order Butterworth mu bandpass.
-        # SOS representation is numerically stable.
-
         self.sos = sp.butter(
             FILTER_ORDER,
             [MU_LOW, MU_HIGH],
@@ -148,46 +134,27 @@ class MuProcessor(gp.Sink):
         )
 
         # Preserve filter state between incoming frames.
-
-        self.zi = np.zeros(
-            (self.sos.shape[0], 2, n_channels),
-            dtype=np.float64
-        )
-
-        # Buffer for incomplete 500 ms windows.
-
-        self.buffer = np.empty(
-            (0, n_channels),
-            dtype=np.float64
-        )
-
-        # Calibration storage.
-
         self.calibration_values = {
             name: [] for name in self.feature_names
         }
 
         # CSV output.
-
         os.makedirs(
             os.path.dirname(self.output_file) or ".",
             exist_ok=True
         )
-
         self.csv_file = open(
             self.output_file,
             "w",
             newline=""
         )
-
         self.csv_writer = csv.writer(
             self.csv_file
         )
-
         self.csv_writer.writerow(
             [
-                "Time_seconds",
-                "Window_number",
+                "Epoch_number",
+                "Epoch_time_seconds",
                 "Calibration",
             ]
             + self.feature_names
@@ -200,33 +167,28 @@ class MuProcessor(gp.Sink):
         print("\nMU PROCESSOR INITIALIZED")
 
         print(f"Sampling rate: {self.fs} Hz")
-        print(f"Window length: {self.window_seconds} s")
-        print(f"Samples per window: {self.window_samples}")
+        print(f"Channels: {n_channels}")
         print(f"C3 channel index: {self.c3_index}")
-
-        print(
-            f"Calibration duration: "
-            f"{self.calibration_seconds} seconds"
-        )
+        print(f"Pre-trigger samples removed: {self.pre_trigger_samples}")
+        print(f"Analysis window: {self.window_seconds} seconds")
+        print(f"Samples per epoch window: {self.window_samples}")
+        print(f"Calibration epochs required: {self.calibration_epochs}")
 
         return super().setup(data, port_context_in)
 
-
     # ========================================================
-    # FILTERING
+    # FILTER ONE COMPLETE EPOCH
     # ========================================================
 
-    def filter_frame(self, frame):
+    def filter_epoch(self, epoch):
 
-        filtered, self.zi = sp.sosfilt(
+        filtered = sp.sosfiltfilt(
             self.sos,
-            frame,
+            epoch,
             axis=0,
-            zi=self.zi
         )
 
         return filtered
-
 
     # ========================================================
     # FEATURE EXTRACTION
@@ -266,7 +228,6 @@ class MuProcessor(gp.Sink):
         )
 
         mu_frequencies = frequencies[mu_mask]
-
         mu_psd = psd[mu_mask, :]
 
         psd_per_channel = np.trapz(
@@ -343,40 +304,29 @@ class MuProcessor(gp.Sink):
             x=average_frequencies[average_mu_mask]
         )
 
-        # ----------------------------------------------------
-        # Return all candidate features
-        # ----------------------------------------------------
 
         return {
             "c3_mean_abs": float(c3_mean_abs),
-
             "c3_psd": float(c3_psd),
-
             "mean_channels_mean_abs": float(
                 mean_channels_mean_abs
             ),
-
             "mean_channels_psd": float(
                 mean_channels_psd
             ),
-
             "median_channels_mean_abs": float(
                 median_channels_mean_abs
             ),
-
             "median_channels_psd": float(
                 median_channels_psd
             ),
-
             "average_signal_mean_abs": float(
                 average_signal_mean_abs
             ),
-
             "average_signal_psd": float(
                 average_signal_psd
             )
         }
-
 
     # ========================================================
     # CALIBRATION
@@ -385,7 +335,6 @@ class MuProcessor(gp.Sink):
     def calibrate(self):
 
         print("\nCALIBRATION FINISHED")
-
         for name in self.feature_names:
 
             values = np.asarray(
@@ -397,27 +346,17 @@ class MuProcessor(gp.Sink):
             maximum = np.max(values)
 
             # Equal-width bins across the calibration range.
-
             if maximum == minimum:
 
-                epsilon = max(
-                    abs(minimum) * 1e-9,
-                    1e-12
-                )
-
+                epsilon = max(abs(minimum) * 1e-9, 1e-12)
                 minimum -= epsilon
                 maximum += epsilon
 
-            edges = np.linspace(
-                minimum,
-                maximum,
-                N_BINS + 1
-            )
+            edges = np.linspace(minimum, maximum, N_BINS + 1)
 
             self.bin_edges[name] = edges
 
             print(f"\n{name}")
-
             print(f"Minimum: {minimum:.8f}")
             print(f"Maximum: {maximum:.8f}")
 
@@ -456,17 +395,17 @@ class MuProcessor(gp.Sink):
 
 
     # ========================================================
-    # PROCESS ONE COMPLETE 500 ms WINDOW
+    # PROCESS ONE EPOCH
     # ========================================================
 
-    def process_window(self, window):
+    def process_epoch(self, epoch):
 
-        features = self.calculate_features(window)
+        features = self.calculate_features(epoch)
 
-        self.windows_received += 1
+        self.epochs_received += 1
 
         timestamp = (
-            self.windows_received
+            self.epochs_received
             * self.window_seconds
         )
 
@@ -490,8 +429,8 @@ class MuProcessor(gp.Sink):
             }
 
             if (
-                self.windows_received
-                >= self.calibration_windows
+                self.epochs_received
+                >= self.calibration_epochs
             ):
 
                 self.calibrate()
@@ -515,7 +454,7 @@ class MuProcessor(gp.Sink):
             # Print the candidate values and bins.
 
             print(
-                f"\nWindow {self.windows_received}"
+                f"\nEpoch {self.epochs_received}"
             )
 
             for name in self.feature_names:
@@ -531,8 +470,8 @@ class MuProcessor(gp.Sink):
         # ----------------------------------------------------
 
         row = [
+            self.epochs_received,
             timestamp,
-            self.windows_received,
             is_calibration
         ]
 
@@ -547,7 +486,6 @@ class MuProcessor(gp.Sink):
         ]
 
         self.csv_writer.writerow(row)
-
         self.csv_file.flush()
 
 
@@ -557,39 +495,46 @@ class MuProcessor(gp.Sink):
 
     def step(self, data):
 
-        frame = data[PORT_IN]
-
-        # Filter incoming samples continuously.
-
-        filtered = self.filter_frame(frame)
-
-        self.samples_received += len(frame)
-
-        # Add the incoming frame to the buffer.
-
-        self.buffer = np.vstack(
-            (self.buffer, filtered)
+        epoch = np.asarray(
+            data[PORT_IN],
+            dtype=np.float64
         )
 
-        # Process every complete 500 ms window.
+        if epoch.ndim != 2:
+            raise ValueError(
+                "Expected an epoch with shape (samples, channels)."
+            )
 
-        while (
-            len(self.buffer)
-            >= self.window_samples
-        ):
+        if epoch.shape[1] != len(self.channel_labels):
+            raise ValueError(
+                "Epoch channel count does not match channel labels."
+            )
 
-            window = self.buffer[
-                :self.window_samples
-            ]
+        self.samples_received += len(epoch)
 
-            self.buffer = self.buffer[
-                self.window_samples:
-            ]
+        # Remove the pre-trigger portion.
+        epoch = epoch[
+            self.pre_trigger_samples:
+        ]
 
-            self.process_window(window)
+        # Keep exactly the post-trigger analysis interval.
+        if len(epoch) < self.window_samples:
+            raise ValueError(
+                f"Epoch is too short: received {len(epoch)} "
+                f"samples, expected {self.window_samples}."
+            )
+
+        epoch = epoch[
+            :self.window_samples
+        ]
+
+        # Filter the complete epoch.
+        filtered_epoch = self.filter_epoch(epoch)
+
+        # Calculate and save one feature set for this epoch.
+        self.process_epoch(filtered_epoch)
 
         return {}
-
 
     # ========================================================
     # SHUTDOWN
@@ -602,7 +547,6 @@ class MuProcessor(gp.Sink):
         if self.csv_file is not None:
 
             self.csv_file.close()
-
             self.csv_file = None
 
         print("\nMU PROCESSOR STOPPED")
@@ -612,7 +556,7 @@ class MuProcessor(gp.Sink):
         )
 
         print(
-            f"Total windows: {self.windows_received}"
+            f"Total epochs: {self.epochs_received}"
         )
 
         print(
