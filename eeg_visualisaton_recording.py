@@ -81,8 +81,6 @@ if __name__ == "__main__":
     scope_left = gp.TriggerScope(amplitude_limit=EPOCH_AMPLITUDE_LIMIT)
 
     eeg_writer = gp.EDFWriter(file_name=f"{output_dir}/{FILE_PREFIX}_{session_str}_eeg.edf", timestamp=False)
-    csv_filename = f"{output_dir}/{FILE_PREFIX}_{session_str}_markers.csv"
-
 
     p.connect(source, bandpass)
     p.connect(bandpass, notch50)
@@ -126,7 +124,7 @@ if __name__ == "__main__":
     stop_event = threading.Event()
     bridge = threading.Thread(
         target=pump_markers,
-        args=(marker_main, specific_markers_dict, stop_event, csv_filename),
+        args=(marker_main, specific_markers_dict, stop_event),
         daemon=True,
     )
     bridge.start()
