@@ -1,52 +1,17 @@
 import threading
 
 import gpype as gp
-from pylsl import StreamInlet, local_clock, resolve_byprop
+from utils import pump_markers
 
 
 USE_REAL_DEVICE = True  
 DEVICE_SERIAL = "UN-2024.12.02"  
 TEST_SIGNAL = False 
 
-MARKER_STREAM_NAME = "PsychoPyMarkers"
-
 CHANNEL_LABELS = ["Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8"]
 N_EEG_CHANNELS = len(CHANNEL_LABELS) 
 FILE_PREFIX = "bci_unicorn" if USE_REAL_DEVICE else "bci_synthetic"
 MARKER_STYLE = { 1: ("rest", "#DA0EA3"), 2: ("right MI", "#FFD700"), 3: ("left MI", "#00BFFF")}
-
-
-def pump_markers(marker: gp.Marker, 
-                 stop: threading.Event):
-    """
-    Forward the PsychoPy LSL marker stream into the pipeline.
-    """
-    inlet = None
-    while not stop.is_set() and inlet is None:
-        found = resolve_byprop("name", MARKER_STREAM_NAME, timeout=1.0)
-        if found:
-            inlet = StreamInlet(found[0], max_buflen=60)
-            print(f"Connected to LSL stream '{MARKER_STREAM_NAME}'.")
-    if inlet is None:
-        return
-
-    offset = gp.ClockOffset(local_clock)  
-    try:
-        correction = inlet.time_correction(timeout=2.0)
-    except Exception:
-        correction = 0.0
-
-    while not stop.is_set():
-        samples, stamps = inlet.pull_chunk(timeout=0.05)
-        for sample, ts in zip(samples, stamps): #type:ignore
-            code = int(sample[0])
-            try:
-                marker.emit(code, observed_at=offset.stamp(ts + correction))
-            except ValueError:
-                # Too old for the pipeline's event margin: stamp it now.
-                marker.emit(code)
-                print(f"Marker {code} arrived late; stamped on arrival.")
-            print(f"Marker received: {code}")
 
 
 if __name__ == "__main__":
@@ -64,15 +29,14 @@ if __name__ == "__main__":
     p.connect(device, source)
     marker = gp.Marker()
 
-    # 2. Processing (For visualization only)
+
     bandpass = gp.Bandpass(f_lo=1, f_hi=40)
     notch50 = gp.Bandstop(f_lo=48, f_hi=52)
-    # Markers are events, EEG is a continuous stream: a Router joins them
-    # into one stream (EEG channels + one marker channel).
+
     merge_prep = gp.Router(input_channels={"eeg": gp.Router.ALL, "mrk": gp.Router.ALL})
     merge_vis = gp.Router(input_channels={"eeg": gp.Router.ALL, "mrk": gp.Router.ALL})
 
-    # 3. Sinks: the live plot, the EDF saver, and the CSV saver
+
     scope = gp.TimeSeriesScope(
         time_window=10,
         markers=[
@@ -85,8 +49,8 @@ if __name__ == "__main__":
             for code, (label, color) in MARKER_STYLE.items()
         ],
     )
-    eeg_writer = gp.EDFWriter(file_name=f"{FILE_PREFIX}_eeg.edf")
-    csv_writer = gp.CsvWriter(file_name=f"{FILE_PREFIX}_eeg_markers.csv")
+    eeg_writer = gp.EDFWriter(file_name=f"{FILE_PREFIX}_eeg.edf", add_timestamp=False)
+    csv_writer = gp.CsvWriter(file_name=f"{FILE_PREFIX}_eeg_markers.csv", add_timestamp=False)
 
 
     p.connect(source, bandpass)
