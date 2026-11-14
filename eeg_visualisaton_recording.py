@@ -2,7 +2,7 @@ import threading
 import gpype as gp
 from utils import pump_markers
 
-USE_REAL_DEVICE = False  
+USE_REAL_DEVICE = True  
 DEVICE_SERIAL = "UN-2024.12.02"  
 TEST_SIGNAL = False 
 
@@ -41,17 +41,11 @@ if __name__ == "__main__":
 
 
     scope = gp.TimeSeriesScope(
-        title="Raw EEG",
+        name="Raw EEG",
         time_window=10,
-        markers=[
-            gp.TimeSeriesScope.Markers(
-                color=color, label=label, channel=N_EEG_CHANNELS, value=code,
-            )
-            for code, (label, color) in MARKER_STYLE.items()
-        ],
-    )
-    eeg_writer = gp.EDFWriter(file_name=f"outputs/{FILE_PREFIX}_eeg.edf", add_timestamp=False)
-
+        markers=[gp.TimeSeriesScope.Markers(color=color, label=label, channel=N_EEG_CHANNELS, value=code) for code, (label, color) in MARKER_STYLE.items()])
+    
+    eeg_writer = gp.EDFWriter(file_name=f"outputs/{FILE_PREFIX}_eeg.edf")
 
     motor_cortex = gp.ChannelSelector(labels=["C3", "C4"])
     fft = gp.FFT(window_size=250) 
@@ -59,16 +53,8 @@ if __name__ == "__main__":
     psd_scope = gp.SpectrumScope(title="Live PSD (C3, C4)", f_lo=1.0, f_hi=30.0)
     
 
-    power_scope = gp.TimeSeriesScope(
-        title="Live 8-13 Hz Power (C3, C4)",
-        time_window=60,
-        markers=[
-            gp.TimeSeriesScope.Markers(
-                color=color, label=label, channel=2, value=code,
-            )
-            for code, (label, color) in MARKER_STYLE.items()
-        ],
-    )
+    power_scope = gp.TimeSeriesScope(title="Live 8-13 Hz Power (C3, C4)", time_window=60, 
+                                     markers=[gp.TimeSeriesScope.Markers(color=color, label=label, channel=2, value=code,) for code, (label, color) in MARKER_STYLE.items()])
     
     power_writer = gp.EDFWriter(file_name=f"outputs/{FILE_PREFIX}_mu_power_features.edf", add_timestamp=False)
 

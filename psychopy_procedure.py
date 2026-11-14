@@ -10,7 +10,7 @@ import csv
 
 
 
-TRIALS_PER_CLASS = 10  #
+TRIALS_PER_CLASS = 16  
 
 trial_sequence = (['left'] * TRIALS_PER_CLASS + ['right'] * TRIALS_PER_CLASS + ['rest'] * TRIALS_PER_CLASS)
 random.shuffle(trial_sequence)
@@ -37,8 +37,8 @@ win = visual.Window([1280, 720], monitor='testMonitor', units='norm', color=[-1,
 txt_welcome = visual.TextStim(win, height=0.065, text=
     "Welcome to the 3-Class Motor Imagery Experiment\n\n"
     "When you see '+', stay still and prepare.\n"
-    "When you see '<', imagine moving your LEFT hand.\n"
-    "When you see '>', imagine moving your RIGHT hand.\n"
+    "When you see '<-', imagine moving your LEFT hand.\n"
+    "When you see '->', imagine moving your RIGHT hand.\n"
     "When you see 'O', fully RELAX and clear your mind.\n\n"
     "Press [SPACE] to begin, or [ESCAPE] to quit.")
 txt_end = visual.TextStim(win, height=0.08, text="Experiment complete.")
@@ -68,10 +68,10 @@ def run_trial(trial_type):
     
     if trial_type == 'right':
         mi_code = 2
-        cue.text = '>'
+        cue.text = '->'
     elif trial_type == 'left':
         mi_code = 3
-        cue.text = '<'
+        cue.text = '<-'
     else:  # rest
         mi_code = 1
         cue.text = 'O'
@@ -90,15 +90,12 @@ def run_trial(trial_type):
             fixation.draw()
             
         # Phase 1: Cue presentation & Task starts (2.0 - 3.25s) -> CUE (Code: 1, 2, or 3)
-        elif t < 3.25:
+        elif t < 6:
             if step <= 1:
                 win.callOnFlip(send, mi_code, f'{trial_type}_cue')
                 step = 2
             cue.draw()
             
-        # Phase 2: Task continues without cue (3.25 - 6.0s)
-        elif t < 6.0:
-            fixation.draw()
             
         else:
             if step == 2:
