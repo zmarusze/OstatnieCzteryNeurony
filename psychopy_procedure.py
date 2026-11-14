@@ -7,24 +7,19 @@ from psychopy import visual, core, event
 from pylsl import StreamInfo, StreamOutlet, local_clock
 import csv
 
-# ---------------------------------------------------------------------------
-# 1. Experiment Config
-# ---------------------------------------------------------------------------
-TARGET_HAND = 'right'  # 'right' (sends 2) or 'left' (sends 3)
+
+TARGET_HAND = 'right'  
 NUM_TRIALS = 20
 
-assert TARGET_HAND in ('right', 'left'), "TARGET_HAND must be 'right' or 'left'"
+assert TARGET_HAND in ('right', 'left')
 
-# ---------------------------------------------------------------------------
-# 2. LSL & Logger Setup
-# ---------------------------------------------------------------------------
-info = StreamInfo(name='PsychoPyMarkers', type='Markers', channel_count=1,
-                  nominal_srate=0, channel_format='int32', source_id='mi_markers')  # type: ignore
+
+info = StreamInfo(name='PsychoPyMarkers', type='Markers', channel_count=1, nominal_srate=0, channel_format='int32', source_id='mi_markers') # type: ignore
 outlet = StreamOutlet(info)
 
-# Timestamped name so a second run never overwrites the first
+
 stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-log_file = open(f'marker_timestamps_{TARGET_HAND}_{stamp}.csv', 'w', newline='')
+log_file = open(f'outputs/marker_timestamps_{TARGET_HAND}_{stamp}.csv', 'w', newline='')
 log_writer = csv.writer(log_file)
 log_writer.writerow(['Timestamp', 'MarkerCode', 'Label'])
 
@@ -35,12 +30,10 @@ def send(marker_code, label):
     outlet.push_sample([marker_code], ts)
     print(f"[{ts:.3f}] sent: {marker_code} ({label})")
     log_writer.writerow([ts, marker_code, label])
-    log_file.flush()  # don't lose markers if the script crashes
+    log_file.flush()  
 
 
-# ---------------------------------------------------------------------------
-# 3. Window & Stimuli
-# ---------------------------------------------------------------------------
+
 win = visual.Window([1280, 720], monitor='testMonitor', units='norm', color=[-1, -1, -1])
 
 txt_welcome = visual.TextStim(win, height=0.065, text=
@@ -53,9 +46,7 @@ fixation = visual.TextStim(win, text='+', height=0.15)
 cue = visual.TextStim(win, text='<' if TARGET_HAND == 'left' else '>', height=0.3, color='#FFD700')
 
 
-# ---------------------------------------------------------------------------
-# 4. Helpers
-# ---------------------------------------------------------------------------
+
 def quit_experiment():
     log_file.close()
     win.close()
@@ -74,9 +65,7 @@ def wait_for_key():
         quit_experiment()
 
 
-# ---------------------------------------------------------------------------
-# 5. Trial Logic
-# ---------------------------------------------------------------------------
+
 def run_trial():
     clock = core.Clock()
     step = 0
@@ -110,9 +99,7 @@ def run_trial():
         check_quit()
 
 
-# ---------------------------------------------------------------------------
-# 6. Main Loop
-# ---------------------------------------------------------------------------
+
 txt_welcome.draw()
 win.flip()
 wait_for_key()
