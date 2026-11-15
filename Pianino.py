@@ -1,22 +1,11 @@
 import os
 import pygame
-import random
-
-# Initialize Pygame and the mixer
-pygame.init()
-pygame.mixer.init()
-
-# Increase the audio channel count so sounds can overlap without cutting each other off
-pygame.mixer.set_num_channels(16)
 
 # Window settings
 WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Dashboard sterowany w Pygame")
 
 # Colors & Clock
 WHITE = (255, 255, 255)
-clock = pygame.time.Clock()
 
 # Słowniki (Dictionaries)
 violin = {
@@ -52,15 +41,33 @@ piano_im = {
 }
 backing_track = {
     1: "BackingTrack_Cmaj2.wav",
-    2: "backing-track-2.wav",
-    3: "backing-track-3.wav",
-    4: "backing-track-4.wav",
+    # 2: "backing-track-2.wav",
+    # 3: "backing-track-3.wav",
+    # 4: "backing-track-4.wav",
 }
 
 
 class DashboardApp:
 
-  def __init__(self, sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track):
+  def __init__(
+      self,
+      sound_dict=piano,
+      image_dict=piano_im,
+      backing_track_dict=backing_track,
+      screen=None,
+  ):
+    pygame.init()
+    if pygame.mixer.get_init() is None:
+      pygame.mixer.init()
+    pygame.mixer.set_num_channels(16)
+
+    self.screen = screen
+    if self.screen is None:
+      self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+      pygame.display.set_caption("Dashboard sterowany w Pygame")
+
+    self.running = True
+
     # Konfiguracja ścieżek
     self.base_dir = os.path.dirname(os.path.abspath(__file__))
     self.images_dir = os.path.join(self.base_dir, "images")
@@ -160,12 +167,23 @@ class DashboardApp:
           else:
               print(f"Brak pliku backing track: {backing_track_path}")
       self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
-      self.draw(screen)
-      pygame.display.flip()
       return None
 
-  def update(self):
-    """Sprawdza, czy minął czas wyświetlania obrazka i wraca do domyślnego."""
+  def update(self, number=None, duration_ms=900):
+    """Process one frame; optionally trigger a note or backing track."""
+    for event in pygame.event.get():
+      if event.type == pygame.QUIT:
+        self.running = False
+      elif event.type == pygame.KEYDOWN:
+        if pygame.K_1 <= event.key <= pygame.K_8:
+          number = event.key - pygame.K_0
+
+    if not self.running:
+      return False
+
+    if number is not None:
+      self.trigger_event_with_backing_track(number, duration_ms)
+
     if (
         self.reset_timer_ticks > 0
         and pygame.time.get_ticks() >= self.reset_timer_ticks
@@ -174,8 +192,14 @@ class DashboardApp:
       self.reset_timer_ticks = 0
       print("Powrót do obrazka domyślnego.")
 
-  def draw(self, surface):
+    self.draw()
+    pygame.display.flip()
+    return self.running
+
+  def draw(self, surface=None):
     """Rysuje aktualny obrazek na środku ekranu."""
+    if surface is None:
+      surface = self.screen
     surface.fill(WHITE)
     if self.current_image:
       # Wyśrodkowanie obrazka 400x400 na oknie 800x600
@@ -183,56 +207,15 @@ class DashboardApp:
       surface.blit(self.current_image, rect)
 
 
-# def main():
-#   app = DashboardApp(sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track)
-#   running = True
-#   trigger_interval_ms = 4000
+def main():
+  app = DashboardApp()
+  clock = pygame.time.Clock()
 
-#   print("Aplikacja Pygame uruchomiona. Zamykanie okna przerywa działanie.")
+  while app.update():
+    clock.tick(60)
 
-#   track_start_time = app.trigger_event_with_backing_track(
-#       1, duration_ms=900
-#   )
-#   if track_start_time is None:
-#     track_start_time = pygame.time.get_ticks()
-#   next_trigger_time = track_start_time + trigger_interval_ms
-
-#   while running:
-#     current_time = pygame.time.get_ticks()
-
-#     for event in pygame.event.get():
-#       if event.type == pygame.QUIT:
-#         running = False
-
-#       # Opcjonalnie: kliknięcie klawiszy 1-8 na klawiaturze do testu manualnego
-#       elif event.type == pygame.KEYDOWN:
-#         if pygame.K_1 <= event.key <= pygame.K_8:
-#           num = event.key - pygame.K_0
-#           track_start_time = app.trigger_event_with_backing_track(
-#               num, duration_ms=900
-#           )
-#           if track_start_time is not None:
-#             next_trigger_time = track_start_time + trigger_interval_ms
-
-#     if running and current_time >= next_trigger_time:
-#       note = random.randint(1, 8)
-#       app.trigger_event(note, duration_ms=900)
-#       missed_intervals = (
-#           current_time - next_trigger_time
-#       ) // trigger_interval_ms
-#       next_trigger_time += (missed_intervals + 1) * trigger_interval_ms
-
-#     # Aktualizacja logiki timera obrazka
-#     app.update()
-
-#     # Renderowanie grafiki
-#     app.draw(screen)
-#     pygame.display.flip()
-
-#     clock.tick(60)
-
-#   pygame.quit()
+  pygame.quit()
 
 
-# if __name__ == "__main__":
-#   main()
+if __name__ == "__main__":
+  main()
