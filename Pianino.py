@@ -1,122 +1,6 @@
-# from PIL import Image, ImageTk
-# import tkinter as tk
-# import winsound
-# import os
-#
-# violin = {1: "violin-c4.wav", 2: "violin-d4.wav", 3: "violin-e4.wav", 4: "violin-f4.wav", 5: "violin-g4.wav",
-#           6: "violin-a4.wav", 7: "violin-b4.wav", 8: "violin-c5.wav"}
-# piano = {1: "piano-c4.wav", 2: "piano-d4.wav", 3: "piano-e4.wav", 4: "piano-f4.wav", 5: "piano-g4.wav",
-#          6: "piano-a4.wav", 7: "piano-b4.wav", 8: "piano-c5.wav"}
-# piano_im = {0: "piano-none.png", 1: "piano-c4.png", 2: "piano-d4.png", 3: "piano-e4.png", 4: "piano-f4.png",
-#             5: "piano-g4.png", 6: "piano-a4.png", 7: "piano-b4.png", 8: "piano-c5.png"}
-# backing_track = {1: "backing-track-1.wav", 2: "backing-track-2.wav", 3: "backing-track-3.wav", 4: "backing-track-4.wav"}
-#
-# class DashboardApp:
-#     def __init__(self, root, sound_dict=piano, image_dict=piano_im):
-#         self.root = root
-#         self.root.title("Dashboard sterowany skryptem")
-#         self.root.geometry("800x600")
-#
-#         # Konfiguracja ścieżek
-#         self.base_dir = "."
-#         self.images_dir = os.path.join(self.base_dir, "images")
-#         self.sounds_dir = os.path.join(self.base_dir, "sound_files")
-#
-#         # Przypisanie słowników do instancji klasy
-#         self.sound_dict = sound_dict
-#         self.image_dict = image_dict
-#
-#         # Tworzenie elementu wyświetlającego obrazek
-#         self.image_label = tk.Label(root)
-#         self.image_label.pack(expand=True, fill="both")
-#
-#         # Ładowanie i skalowanie obrazka domyślnego (klucz 0)
-#         default_img_name = self.image_dict.get(0, "piano-none.png")
-#         self.default_img_path = os.path.join(self.images_dir, default_img_name)
-#
-#         self.current_image = self.load_and_resize_image(self.default_img_path, size=(400, 400))
-#         if self.current_image:
-#             self.image_label.config(image=self.current_image)
-#
-#         # Zmienna do przechowywania ID timera
-#         self.timer_id = None
-#
-#     def load_and_resize_image(self, path, size=(400, 400)):
-#         """Pomocnicza metoda do wczytywania i skalowania obrazka przez Pillow."""
-#         if os.path.exists(path):
-#             pil_image = Image.open(path)
-#             pil_image = pil_image.resize(size, Image.Resampling.LANCZOS)
-#             return ImageTk.PhotoImage(pil_image)
-#         else:
-#             print(f"Brak pliku obrazka: {path}")
-#             return None
-#
-#     def trigger_event(self, number, duration_ms=3000):
-#         """
-#         Funkcja wywoływana, gdy otrzymasz input liczbowy (1-8).
-#         """
-#         if number not in self.sound_dict or number not in self.image_dict:
-#             print("Liczba musi być w zakresie od 1 do 8.")
-#             return
-#
-#         # 1. Zmiana obrazka (pobieranie z folderu images)
-#         img_name = self.image_dict[number]
-#         img_path = os.path.join(self.images_dir, img_name)
-#
-#         new_img = self.load_and_resize_image(img_path, size=(400, 400))
-#         if new_img:
-#             self.new_image = new_img  # Przypisanie do pola, żeby Garbage Collector nie skasował obrazka
-#             self.image_label.config(image=self.new_image)
-#
-#         # 2. Odtworzenie dźwięku .wav (pobieranie z folderu sound_files)
-#         sound_name = self.sound_dict[number]
-#         sound_path = os.path.join(self.sounds_dir, sound_name)
-#
-#         if os.path.exists(sound_path):
-#             winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
-#         else:
-#             print(f"Brak pliku dźwiękowego: {sound_path}")
-#
-#         # 3. Obsługa timera powrotu do stanu domyślnego
-#         if self.timer_id is not None:
-#             self.root.after_cancel(self.timer_id)
-#
-#         self.timer_id = self.root.after(duration_ms, self.reset_to_default)
-#
-#     def reset_to_default(self):
-#         """Przywraca domyślny obrazek po upływie czasu."""
-#         if self.current_image:
-#             self.image_label.config(image=self.current_image)
-#         self.timer_id = None
-#         print("Powrót do obrazka domyślnego.")
-#
-#
-# # --- Testowanie działania ---
-# if __name__ == "__main__":
-#     root = tk.Tk()
-#     app = DashboardApp(root, sound_dict=piano, image_dict=piano_im)
-#
-#     # Symulacja wywołania po 2 sekundach dla liczby 3
-#     # root.after(2000, lambda: app.trigger_event(3, duration_ms=4000))
-#     # Pętla od 1 do 8 (włącznie)
-#     # 1. Pierwsza pętla (w górę: 1 do 8)
-#     for note in range(1, 9):
-#         # Każda kolejna nuta co 1 sekundę (1000ms, 2000ms, ..., 8000ms)
-#         root.after(note * 1000, lambda n=note: app.trigger_event(n, duration_ms=900))
-#         root.after(note * 100, lambda n=note: app.trigger_event(n, duration_ms=900))
-#
-#     # 2. Druga pętla (w dół: 8 do 1) - uruchomi się PO pierwszej pętli
-#     # Pierwsza pętla kończy się po 8 sekundach (8000ms), więc dodajemy bazowe opóźnienie 8000ms
-#     base_delay = 8000
-#     for note in range(8, 0, -1):
-#         # Czas startu to bazowe 8 sekund + kolejne sekundy dla danej nuty
-#         delay = base_delay + (9 - note) * 1000
-#         root.after(delay, lambda n=note: app.trigger_event(n, duration_ms=900))
-#
-#     root.mainloop()
-
 import os
 import pygame
+import random
 
 # Initialize Pygame and the mixer
 pygame.init()
@@ -167,7 +51,7 @@ piano_im = {
     8: "piano-c5.png",
 }
 backing_track = {
-    1: "backing-track-1.wav",
+    1: "BackingTrack_Cmaj2.wav",
     2: "backing-track-2.wav",
     3: "backing-track-3.wav",
     4: "backing-track-4.wav",
@@ -185,13 +69,31 @@ class DashboardApp:
     self.sound_dict = sound_dict
     self.image_dict = image_dict
     self.backing_track_dict = backing_track_dict
+
+    self.images = {}
+    for number, image_name in self.image_dict.items():
+      image_path = os.path.join(self.images_dir, image_name)
+      self.images[number] = self.load_and_resize_image(
+          image_path, size=(400, 400)
+      )
+
+    self.sounds = {}
+    for number, sound_name in self.sound_dict.items():
+      sound_path = os.path.join(self.sounds_dir, sound_name)
+      if os.path.exists(sound_path):
+        try:
+          self.sounds[number] = pygame.mixer.Sound(sound_path)
+        except Exception as e:
+          print(f"Błąd ładowania dźwięku {sound_path}: {e}")
+      else:
+        print(f"Brak pliku dźwiękowego: {sound_path}")
+
     # Wczytanie obrazka domyślnego (klucz 0)
     default_img_name = self.image_dict.get(0, "piano-none.png")
-    self.default_img_path = os.path.join(self.images_dir, default_img_name)
-
-    self.default_image = self.load_and_resize_image(
-        self.default_img_path, size=(400, 400)
-    )
+    self.default_image = self.images.get(0)
+    if self.default_image is None:
+      self.default_img_path = os.path.join(self.images_dir, default_img_name)
+      self.default_image = self.load_and_resize_image(self.default_img_path)
     self.current_image = self.default_image
 
     # Timer do powrotu do stanu domyślnego (przechowuje znacznik czasu w ms)
@@ -220,53 +122,47 @@ class DashboardApp:
       return
 
     # 1. Zmiana obrazka
-    img_name = self.image_dict[number]
-    img_path = os.path.join(self.images_dir, img_name)
-    loaded_img = self.load_and_resize_image(img_path, size=(400, 400))
+    loaded_img = self.images.get(number)
     if loaded_img:
       self.current_image = loaded_img
 
-    # 2. Odtworzenie dźwięku .wav na wolnym kanale (pozwala na nakładanie dźwięków)
-    sound_name = self.sound_dict[number]
-    sound_path = os.path.join(self.sounds_dir, sound_name)
-
-    if os.path.exists(sound_path):
-      try:
-        sound = pygame.mixer.Sound(sound_path)
-        channel = pygame.mixer.find_channel()
-        if channel:
-          channel.play(sound)
-        else:
-          # Jeśli wszystkie kanały są zajęte, użyj domyślnego
-          sound.play()
-      except Exception as e:
-        print(f"Błąd odtwarzania dźwięku {sound_path}: {e}")
+    # 2. Odtworzenie wcześniej załadowanego dźwięku .wav
+    sound = self.sounds.get(number)
+    if sound is not None:
+      channel = pygame.mixer.find_channel()
+      if channel:
+        channel.play(sound)
+      else:
+        sound.play()
     else:
-      print(f"Brak pliku dźwiękowego: {sound_path}")
+      print(f"Nie można odtworzyć dźwięku dla nuty {number}.")
 
     # 3. Ustawienie czasu powrotu do stanu domyślnego
     self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
 
-    def trigger_event_with_backing_track(self, number, duration_ms=3000):
-        """Wywołuje trigger_event i odtwarza backing track w tle."""
-        if number not in self.backing_track_dict and number in self.sound_dict and number in self.image_dict:
-          self.trigger_event(number, duration_ms)
-        # Odtwarzanie backing track w tle
-        backing_track_name = self.backing_track_dict.get(number)
-        if backing_track_name:
-            backing_track_path = os.path.join(self.sounds_dir, backing_track_name)
-            if os.path.exists(backing_track_path):
-                try:
-                    backing_sound = pygame.mixer.Sound(backing_track_path)
-                    channel = pygame.mixer.find_channel()
-                    if channel:
-                        channel.play(backing_sound)
-                    else:
-                        backing_sound.play()
-                except Exception as e:
-                    print(f"Błąd odtwarzania backing track {backing_track_path}: {e}")
-            else:
-                print(f"Brak pliku backing track: {backing_track_path}")
+  def trigger_event_with_backing_track(self, number, duration_ms=3000):
+      """Wywołuje trigger_event i odtwarza backing track w tle."""
+      if number not in self.backing_track_dict and number in self.sound_dict and number in self.image_dict:
+        self.trigger_event(number, duration_ms)
+        return
+      # Odtwarzanie backing track w tle
+      backing_track_name = self.backing_track_dict.get(number)
+      if backing_track_name:
+          backing_track_path = os.path.join(self.sounds_dir, backing_track_name)
+          if os.path.exists(backing_track_path):
+              try:
+                  pygame.mixer.music.load(backing_track_path)
+                  pygame.mixer.music.play()
+                  self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
+                  return pygame.time.get_ticks()
+              except Exception as e:
+                  print(f"Błąd odtwarzania backing track {backing_track_path}: {e}")
+          else:
+              print(f"Brak pliku backing track: {backing_track_path}")
+      self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
+      self.draw(screen)
+      pygame.display.flip()
+      return None
 
   def update(self):
     """Sprawdza, czy minął czas wyświetlania obrazka i wraca do domyślnego."""
@@ -287,63 +183,56 @@ class DashboardApp:
       surface.blit(self.current_image, rect)
 
 
-def main():
-  app = DashboardApp(sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track)
-  running = True
+# def main():
+#   app = DashboardApp(sound_dict=piano, image_dict=piano_im, backing_track_dict=backing_track)
+#   running = True
+#   trigger_interval_ms = 4000
 
-  # --- Symulacja sekwencji uruchomienia (odpowiednik root.after w Tkinter) ---
-  # Używamy niestandardowych zdarzeń czasowych Pygame do testowej sekwencji
-  TIMED_EVENT_START = pygame.USEREVENT + 1
+#   print("Aplikacja Pygame uruchomiona. Zamykanie okna przerywa działanie.")
 
-  # Zaplanowanie testowych wywołań (identycznych jak Twoja pętla)
-  # Pierwsza pętla: 1 do 8 co 1000ms
-  for note in range(1, 9):
-    delay_ms = note * 4000
-    pygame.time.set_timer(
-        TIMED_EVENT_START + note, delay_ms, 1
-    )  # Jednorazowy timer
+#   track_start_time = app.trigger_event_with_backing_track(
+#       1, duration_ms=900
+#   )
+#   if track_start_time is None:
+#     track_start_time = pygame.time.get_ticks()
+#   next_trigger_time = track_start_time + trigger_interval_ms
 
-  # Druga pętla: 8 do 1 od 9000ms
-  base_delay = 32000  # 8 sekund + 1 sekunda buforu
-  for idx, note in enumerate(range(8, 0, -1)):
-    delay_ms = base_delay + ((idx + 1) * 4000)
-    pygame.time.set_timer(TIMED_EVENT_START + 100 + note, delay_ms, 1)
+#   while running:
+#     current_time = pygame.time.get_ticks()
 
-  print("Aplikacja Pygame uruchomiona. Zamykanie okna przerywa działanie.")
+#     for event in pygame.event.get():
+#       if event.type == pygame.QUIT:
+#         running = False
 
-  while running:
-    current_time = pygame.time.get_ticks()
+#       # Opcjonalnie: kliknięcie klawiszy 1-8 na klawiaturze do testu manualnego
+#       elif event.type == pygame.KEYDOWN:
+#         if pygame.K_1 <= event.key <= pygame.K_8:
+#           num = event.key - pygame.K_0
+#           track_start_time = app.trigger_event_with_backing_track(
+#               num, duration_ms=900
+#           )
+#           if track_start_time is not None:
+#             next_trigger_time = track_start_time + trigger_interval_ms
 
-    for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-        running = False
+#     if running and current_time >= next_trigger_time:
+#       note = random.randint(1, 8)
+#       app.trigger_event(note, duration_ms=900)
+#       missed_intervals = (
+#           current_time - next_trigger_time
+#       ) // trigger_interval_ms
+#       next_trigger_time += (missed_intervals + 1) * trigger_interval_ms
 
-      # Obsługa testowych timerów sekwencji
-      elif event.type >= TIMED_EVENT_START:
-        event_id = event.type - TIMED_EVENT_START
-        if event_id < 100:
-          app.trigger_event(event_id, duration_ms=900)
-        else:
-          note_val = event_id - 100
-          app.trigger_event(note_val, duration_ms=900)
+#     # Aktualizacja logiki timera obrazka
+#     app.update()
 
-      # Opcjonalnie: kliknięcie klawiszy 1-8 na klawiaturze do testu manualnego
-      elif event.type == pygame.KEYDOWN:
-        if pygame.K_1 <= event.key <= pygame.K_8:
-          num = event.key - pygame.K_0
-          app.trigger_event(num, duration_ms=900)
+#     # Renderowanie grafiki
+#     app.draw(screen)
+#     pygame.display.flip()
 
-    # Aktualizacja logiki timera obrazka
-    app.update()
+#     clock.tick(60)
 
-    # Renderowanie grafiki
-    app.draw(screen)
-    pygame.display.flip()
-
-    clock.tick(60)
-
-  pygame.quit()
+#   pygame.quit()
 
 
-if __name__ == "__main__":
-  main()
+# if __name__ == "__main__":
+#   main()
