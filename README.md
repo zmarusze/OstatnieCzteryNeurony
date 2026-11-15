@@ -1,4 +1,4 @@
-# 🧠🎹 Heroes of the Brain Hackathon — Ostatnie Cztery Neurony
+# 🧠🎹 Heroes of the Brain Hackathon — Ostatnie Cztery Neurony 
 
 ### Your brain. Your music. Your instrument.
 
@@ -22,7 +22,7 @@ If you're new to the project, here's how to explore and use it.
 
 ### 1. Set up your environment
 
-Start with our setup file. It contains the dependencies and installation instructions needed to prepare your Python environment.
+Start with the 'requirements.txt' file. It contains the dependencies needed to prepare your Python environment.
 
 Make sure to complete the setup before running any of the project scripts.
 
@@ -118,7 +118,3 @@ A few things to keep in mind:
 And most importantly, have fun!
 
 We hope you'll enjoy discovering how your brain can become a musical instrument. With practice, you might even get better at controlling the piano and playing your own songs — one thought at a time.
-
----
-
-**Made with 🧠, 🎶, and a few stubborn neurons by Ostatnie Cztery Neurony for the Heroes of the Brain Hackathon.**
