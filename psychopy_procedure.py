@@ -7,15 +7,16 @@ from datetime import datetime
 from psychopy import visual, core, event
 from pylsl import StreamInfo, StreamOutlet, local_clock
 import csv
+from constants import MARKER_STREAM_NAME
 
 
 
-TRIALS_PER_CLASS = 16  
+TRIALS_PER_CLASS = 16  #can be extended
 
 trial_sequence = (['left'] * TRIALS_PER_CLASS + ['right'] * TRIALS_PER_CLASS + ['rest'] * TRIALS_PER_CLASS)
-random.shuffle(trial_sequence)
+random.shuffle(trial_sequence) #random to omit anticipation of the cue
 
-info = StreamInfo(name='PsychoPyMarkers', type='Markers', channel_count=1, nominal_srate=0, channel_format='int32', source_id='mi_markers')  # type: ignore
+info = StreamInfo(name=MARKER_STREAM_NAME, type='Markers', channel_count=1, nominal_srate=0, channel_format='int32', source_id='mi_markers')  # type: ignore
 outlet = StreamOutlet(info)
 
 
@@ -25,7 +26,6 @@ log_writer = csv.writer(log_file)
 log_writer.writerow(['Timestamp', 'MarkerCode', 'Label'])
 
 def send(marker_code, label):
-    """Pushes an integer marker to LSL and logs it."""
     ts = local_clock()
     outlet.push_sample([marker_code], ts)
     print(f"[{ts:.3f}] sent: {marker_code} ({label})")

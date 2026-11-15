@@ -1,0 +1,4 @@
+MARKER_STREAM_NAME = "PsychoPyMarkers"
+DEVICE_SERIAL = "UN-2024.12.02" 
+CHANNEL_LABELS = ["Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8"]
+N_EEG_CHANNELS = len(CHANNEL_LABELS) 

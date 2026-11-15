@@ -1,13 +1,8 @@
 import os
 import pygame
 
-# Window settings
 WIDTH, HEIGHT = 800, 600
-
-# Colors & Clock
 WHITE = (255, 255, 255)
-
-# Słowniki (Dictionaries)
 violin = {
     1: "violin-c4.wav",
     2: "violin-d4.wav",
@@ -48,14 +43,13 @@ backing_track = {
 
 
 class DashboardApp:
-
   def __init__(
       self,
       sound_dict=piano,
       image_dict=piano_im,
       backing_track_dict=backing_track,
-      screen=None,
-  ):
+      screen=None):
+    
     pygame.init()
     if pygame.mixer.get_init() is None:
       pygame.mixer.init()
@@ -64,11 +58,9 @@ class DashboardApp:
     self.screen = screen
     if self.screen is None:
       self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-      pygame.display.set_caption("Dashboard sterowany w Pygame")
+      pygame.display.set_caption("BrainComposerInterface")
 
     self.running = True
-
-    # Konfiguracja ścieżek
     self.base_dir = os.path.dirname(os.path.abspath(__file__))
     self.images_dir = os.path.join(self.base_dir, "images")
     self.sounds_dir = os.path.join(self.base_dir, "sound_files")
@@ -91,49 +83,41 @@ class DashboardApp:
         try:
           self.sounds[number] = pygame.mixer.Sound(sound_path)
         except Exception as e:
-          print(f"Błąd ładowania dźwięku {sound_path}: {e}")
+          print(f"Error of audio loading {sound_path}: {e}")
       else:
-        print(f"Brak pliku dźwiękowego: {sound_path}")
+        print(f"Lack of audio files: {sound_path}")
 
-    # Wczytanie obrazka domyślnego (klucz 0)
     default_img_name = self.image_dict.get(0, "piano-none.png")
     self.default_image = self.images.get(0)
     if self.default_image is None:
       self.default_img_path = os.path.join(self.images_dir, default_img_name)
       self.default_image = self.load_and_resize_image(self.default_img_path)
     self.current_image = self.default_image
-
-    # Timer do powrotu do stanu domyślnego (przechowuje znacznik czasu w ms)
     self.reset_timer_ticks = 0
 
   def load_and_resize_image(self, path, size=(400, 400)):
-    """Pomocnicza metoda do wczytywania i skalowania obrazka przez Pygame."""
     if os.path.exists(path):
       try:
         img = pygame.image.load(path).convert_alpha()
         return pygame.transform.smoothscale(img, size)
       except Exception as e:
-        print(f"Błąd ładowania obrazka {path}: {e}")
+        print(f"Loading error {path}: {e}")
         return None
     else:
-      print(f"Brak pliku obrazka: {path}")
-      # Tworzenie pustej zastępczej powierzchni, jeśli plik nie istnieje
+      print(f"No image file {path}")
       fallback = pygame.Surface(size)
       fallback.fill((200, 200, 200))
       return fallback
 
   def trigger_event(self, number, duration_ms=3000):
-    """Funkcja wywoływana, gdy otrzymasz input liczbowy (1-8)."""
     if number not in self.sound_dict or number not in self.image_dict:
-      print("Liczba musi być w zakresie od 1 do 8.")
+      print("The number needs to be in range 1-8.")
       return
 
-    # 1. Zmiana obrazka
     loaded_img = self.images.get(number)
     if loaded_img:
       self.current_image = loaded_img
 
-    # 2. Odtworzenie wcześniej załadowanego dźwięku .wav
     sound = self.sounds.get(number)
     if sound is not None:
       channel = pygame.mixer.find_channel()
@@ -142,17 +126,14 @@ class DashboardApp:
       else:
         sound.play()
     else:
-      print(f"Nie można odtworzyć dźwięku dla nuty {number}.")
+      print(f"Error for note number {number}.")
 
-    # 3. Ustawienie czasu powrotu do stanu domyślnego
     self.reset_timer_ticks = pygame.time.get_ticks() + duration_ms
 
   def trigger_event_with_backing_track(self, number, duration_ms=3000):
-      """Wywołuje trigger_event i odtwarza backing track w tle."""
       if number not in self.backing_track_dict and number in self.sound_dict and number in self.image_dict:
         self.trigger_event(number, duration_ms)
         return
-      # Odtwarzanie backing track w tle
       backing_track_name = self.backing_track_dict.get(number)
       if backing_track_name:
           backing_track_path = os.path.join(self.sounds_dir, backing_track_name)
@@ -200,11 +181,10 @@ class DashboardApp:
     """Rysuje aktualny obrazek na środku ekranu."""
     if surface is None:
       surface = self.screen
-    surface.fill(WHITE)
+    surface.fill(WHITE) #type:ignore
     if self.current_image:
-      # Wyśrodkowanie obrazka 400x400 na oknie 800x600
       rect = self.current_image.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-      surface.blit(self.current_image, rect)
+      surface.blit(self.current_image, rect) #type:ignore
 
 
 def main():

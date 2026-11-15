@@ -3,16 +3,14 @@ import numpy as np
 import mido
 import threading
 import time
+from constants import DEVICE_SERIAL, CHANNEL_LABELS, N_EEG_CHANNELS
+
 
 '''
-Native PTP amplitude-based auditory artifact detection system. 
+Native PTP amplitude-based auditory artifact detection (AAD) system. 
 '''
 
 USE_REAL_DEVICE = True
-DEVICE_SERIAL = "UN-2019.02.66"  
-
-CHANNEL_LABELS = ["Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8"]
-N_EEG_CHANNELS = len(CHANNEL_LABELS) 
 
 class ArtifactToMusicProcessor(gp.Sink):
     def __init__(self, window_seconds=2.0, s_rate=250):
@@ -88,7 +86,6 @@ if __name__ == "__main__":
     if USE_REAL_DEVICE: 
         device = gp.HybridBlack(serial=DEVICE_SERIAL, channel_selection=list(range(N_EEG_CHANNELS)), enable_oscar=True) 
     else:
-        # Fake generator
         device = gp.Generator(signal_amplitude=20.0, noise_amplitude=5.0)
         
     source = gp.ChannelLabeler(labels=CHANNEL_LABELS)
@@ -102,10 +99,8 @@ if __name__ == "__main__":
     p.connect(device, source)
     p.connect(source, bandpass)
     p.connect(bandpass, notch50)
-    
     p.connect(notch50, scope)
     p.connect(notch50, music_processor)
-
     app.add_widget(scope)         
 
     print("Pipeline running! Listening for artifacts in 2-second windows...")

@@ -12,26 +12,24 @@ PORT_IN = gp.Constants.Defaults.PORT_IN
 
 MU_LOW, MU_HIGH, FILTER_ORDER = 8.0, 12.0, 4
 WINDOW_SECONDS = 4
-PRE_TRIGGER_SECS = 0.1  # MUST MATCH TRIGGER IN EEG REMASTER
+PRE_TRIGGER_SECS = 0.1  
 CALIBRATION_SECONDS = 160.0
 N_BINS = 8
 C3_CHANNEL = "C3"
 OUTPUT_FILE = Path("outputs") / "mu_features.csv"
 
-FEATURE_NAMES = [
-    "c3_mean_abs"#, "c3_psd",
+#chosen feature after trial calibration
+FEATURE_NAMES = ["c3_mean_abs"#, "c3_psd",
     #"mean_channels_mean_abs", "mean_channels_psd",
     #"average_signal_mean_abs", "average_signal_psd",
-]
+    ]
 
 BINS_FILE = Path("outputs") / "bin_edges.json"
 
 def _band_metrics(signal, fs):  # [ADDED] Extracted standalone helper so neurofeedback script can reuse exact math
     """Returns (mean_abs, mu_band_psd) along axis 0 for 1D or 2D signals."""
     mean_abs = np.mean(np.abs(signal), axis=0)
-    freqs, psd = sp.periodogram(
-        signal, fs=fs, window="hann", detrend="constant", scaling="density", axis=0
-    )
+    freqs, psd = sp.periodogram(signal, fs=fs, window="hann", detrend="constant", scaling="density", axis=0)
     mask = (freqs >= MU_LOW) & (freqs <= MU_HIGH)
     band_psd = np.trapz(psd[mask], x=freqs[mask], axis=0)
     return mean_abs, band_psd
@@ -73,7 +71,7 @@ class MuProcessor(gp.Sink):
     ):
         kwargs.setdefault(
             KEYS.INPUT_PORTS,
-            [gp.IPort.Configuration(name=PORT_IN, timing=gp.Constants.Timing.ASYNC)],
+            [gp.IPort.Configuration(name=PORT_IN, timing=gp.Constants.Timing.ASYNC)], #type:ignore
         )
         super().__init__(**kwargs)
 
@@ -161,7 +159,7 @@ class MuProcessor(gp.Sink):
         print(f"\n8-BIN CALIBRATION COMPLETE (Saved to {self.bins_file})\n")
 
     def get_bin(self, name, value):
-        return int(np.clip(idx, 1, N_BINS))
+        return int(np.clip(idx, 1, N_BINS)) #type:ignore
 
     def _get_epoch_label(self, epoch_num, is_calibration):
         if isinstance(self.epoch_labels, dict):
@@ -211,7 +209,7 @@ class MuProcessor(gp.Sink):
             [self.epochs_received, label, self.epochs_received * self.window_seconds, is_calibration]
             + metric_cells
         )
-        self.csv_file.flush()
+        self.csv_file.flush() #type:ignore
         return {}
 
     def stop(self):

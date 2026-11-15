@@ -1,22 +1,12 @@
 import mne
 import numpy as np
 import gpype as gp
-
-# FixedRateSource is the base class gpype's own Generator / CsvReader use:
-# it runs the pacing thread for you (one cycle per sample).
 from gpype.backend.sources.base.fixed_rate_source import FixedRateSource
+from mu_calibration import MuProcessor
 
-# IMPORT YOUR PROCESSOR HERE
-from mu_processing import MuProcessor
-
-# ==========================================
-# CONFIGURATION
-# ==========================================
 CHANNEL_LABELS = ["Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8"]
 N_EEG_CHANNELS = len(CHANNEL_LABELS)
 
-# MNE returns volts; g.tec amplifiers (and the gpype scope defaults) work in
-# microvolts. Set to 1.0 if your MuProcessor expects raw volts.
 VOLTS_TO_MICROVOLTS = 1e6
 
 KEYS = gp.Constants.Keys
@@ -24,9 +14,6 @@ PORT_IN = gp.Constants.Defaults.PORT_IN
 PORT_OUT = gp.Constants.Defaults.PORT_OUT
 
 
-# ==========================================
-# 1. CUSTOM PHYSIONET SOURCE NODE
-# ==========================================
 class PhysioNetDevice(FixedRateSource):
     """
     Simulates a real EEG device by streaming a PhysioNet recording
@@ -37,10 +24,9 @@ class PhysioNetDevice(FixedRateSource):
     Otherwise the recording would play chunk_size times too fast.
     """
 
-    def __init__(self, subject=1, run=4, chunk_size=16, **kwargs):
+    def __init__(self, subject=3, run=2, chunk_size=16, **kwargs):
         print(f"Loading PhysioNet Subject {subject}, Run {run}...")
 
-        # Suppress MNE verbosity for clean console
         mne.set_log_level("WARNING")
         file_paths = mne.datasets.eegbci.load_data(subject, [run])
 
@@ -51,7 +37,7 @@ class PhysioNetDevice(FixedRateSource):
         raw.reorder_channels(CHANNEL_LABELS)
 
         fs = float(raw.info["sfreq"])
-        samples = raw.get_data().T * VOLTS_TO_MICROVOLTS
+        samples = raw.get_data().T * VOLTS_TO_MICROVOLTS #type:ignore
         self._samples = np.ascontiguousarray(samples, dtype=gp.Constants.DATA_TYPE)
         self._position = 0
         self._exhausted = False
@@ -75,17 +61,11 @@ class PhysioNetDevice(FixedRateSource):
         return float(self.config[self.Configuration.Keys.SAMPLING_RATE])
 
     def setup(self, data, port_context_in):
-        # Sampling rate, channel count, frame size and frame rate are
-        # declared by FixedRateSource / Source from the constructor
-        # arguments. Only the playback position needs resetting here,
-        # because setup() runs again on every start.
         self._position = 0
         self._exhausted = False
         return super().setup(data, port_context_in)
 
-    def step(self, data=None):
-        # The pacing thread calls this once per sample; only every
-        # chunk_size-th call is allowed to emit a chunk.
+    def step(self, data=None): #type:ignore
         if not self.is_decimation_step():
             return None
         if self._exhausted:
@@ -97,9 +77,6 @@ class PhysioNetDevice(FixedRateSource):
 
         end = self._position + chunk_size
         if end > self._samples.shape[0]:
-            # A partial chunk would break the sampling grid, so playback
-            # ends on the last whole chunk. (Raising StopIteration here
-            # would kill the pacing thread with a traceback instead.)
             self._exhausted = True
             print("\n--- End of PhysioNet playback reached ---")
             return None
@@ -109,9 +86,6 @@ class PhysioNetDevice(FixedRateSource):
         return {PORT_OUT: chunk}
 
 
-# ==========================================
-# 2. CUSTOM CONTINUOUS EPOCH NODE
-# ==========================================
 class ContinuousEpoch(gp.IONode):
     """
     Buffers continuous data and outputs a fixed-size epoch of
@@ -131,16 +105,10 @@ class ContinuousEpoch(gp.IONode):
             raise ValueError("window_seconds and step_seconds must span at "
                              "least one sample.")
 
-        # frame_size is a derived value; drop it if a serialized document
-        # passes it back in.
         kwargs.pop(KEYS.FRAME_SIZE, None)
-
-        # Epochs are discrete events, not a continuous stream, so the output
-        # port is ASYNC (same as gp.Trigger). A node with an ASYNC input,
-        # such as MuProcessor, refuses to connect to a SYNC port.
         kwargs.setdefault(
             KEYS.OUTPUT_PORTS,
-            [gp.OPort.Configuration(timing=gp.Constants.Timing.ASYNC)],
+            [gp.OPort.Configuration(timing=gp.Constants.Timing.ASYNC)], #type:ignore
         )
 
         super().__init__(frame_size=self._window_samples, **kwargs)
@@ -176,73 +144,57 @@ class ContinuousEpoch(gp.IONode):
         out = port_context_out[PORT_OUT]
         out[KEYS.FRAME_SIZE] = self._window_samples
         out[gp.OPort.Configuration.Keys.TIMING] = gp.Constants.Timing.ASYNC
-        # Epochs have no fixed frame rate; drop the one inherited from the
-        # continuous input.
         out.pop(KEYS.FRAME_RATE, None)
         return port_context_out
 
     def step(self, data):
         block = data[PORT_IN]
         rows = block.shape[0]
-        window = self._buf.shape[0]
+        window = self._buf.shape[0] #type:ignore
 
-        # Rolling buffer, oldest sample first.
+
         if rows >= window:
-            self._buf[:] = block[-window:]
+            self._buf[:] = block[-window:] #type:ignore
         elif rows:
-            self._buf[:-rows] = self._buf[rows:]
-            self._buf[-rows:] = block
+            self._buf[:-rows] = self._buf[rows:] #type:ignore
+            self._buf[-rows:] = block #type:ignore
 
         self._filled = min(window, self._filled + rows)
         self._since_last += rows
 
-        # Wait until a full window exists, then emit once per step
-        # (counted in samples, not cycles).
         if self._filled < window or self._since_last < self._step_samples:
             return None
         self._since_last -= self._step_samples
 
-        # Copy: the buffer is reused immediately.
-        return {PORT_OUT: self._buf.copy()}
+        return {PORT_OUT: self._buf.copy()} #type:ignore
 
 
-# ==========================================
-# 3. MAIN PIPELINE
-# ==========================================
 if __name__ == "__main__":
     app = gp.MainApp()
     p = gp.Pipeline()
 
-    # 1. Source (PhysioNet Dataset)
     device = PhysioNetDevice(subject=1, run=4, chunk_size=16)
     labeler = gp.ChannelLabeler(labels=CHANNEL_LABELS)
 
-    # 2. Preprocessing
     bandpass = gp.Bandpass(f_lo=1, f_hi=40)
     notch50 = gp.Bandstop(f_lo=48, f_hi=52)
 
-    # 3. Epoching (output an epoch every 4.1 seconds)
     window = ContinuousEpoch(
         sampling_rate=device.fs, window_seconds=4.1, step_seconds=4.1
     )
 
-    # 4. Your MuProcessor (Imported!)
     mu_processor = MuProcessor(
         channel_labels=CHANNEL_LABELS,
         pre_trigger_secs=0.1,
-        window_seconds=4.0,
-        calibration_seconds=60.0,  # Kept at 60s so it finishes before the 120s dataset ends!
+        window_seconds=4.0, #type:ignore
+        calibration_seconds=60.0,  
     )
 
-    # 5. Visualization Scope
     scope = gp.TimeSeriesScope(name="PhysioNet EEG Playback", time_window=10)
 
-    # --- Connections ---
     p.connect(device, labeler)
     p.connect(labeler, bandpass)
     p.connect(bandpass, notch50)
-
-    # Split the clean data: send to scope AND to our windowing node
     p.connect(notch50, scope)
 
     p.connect(notch50, window)

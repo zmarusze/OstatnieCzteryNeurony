@@ -1,16 +1,8 @@
-import threading
-import gpype as gp
-from pylsl import StreamInlet, local_clock, resolve_byprop
-import csv
-
-MARKER_STREAM_NAME = "PsychoPyMarkers"
-
 import csv
 import threading
 import gpype as gp
 from pylsl import StreamInlet, local_clock, resolve_byprop
-
-MARKER_STREAM_NAME = "PsychoPyMarkers"
+from constants import MARKER_STREAM_NAME
 
 def pump_markers(marker: gp.Marker, 
                  stop: threading.Event, 
