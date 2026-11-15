@@ -184,8 +184,9 @@ class MuProcessor(gp.Sink):
             for cell in (f"{features[name]:.6f}", bins[name])
         ]
         self.csv_writer.writerow(
-            [self.epochs_received, label, self.epochs_received * self.window_seconds, is_calibration]
-            + metric_cells
+            [self.epochs_received, self.epochs_received * self.window_seconds, is_calibration]
+            + [features[name] for name in FEATURE_NAMES]
+            + [bins[name] for name in FEATURE_NAMES]
         )
         self.csv_file.flush()
         return {}
@@ -199,3 +200,4 @@ class MuProcessor(gp.Sink):
             f"\nMU PROCESSOR STOPPED\nTotal samples: {self.samples_received}\n"
             f"Total epochs: {self.epochs_received}\nResults saved to: {self.output_file}"
         )
+.
