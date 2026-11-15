@@ -5,8 +5,9 @@ import threading
 import time
 
 '''
-Native PTP amplitude-based auditory artifact artifact detection system. 
+Native PTP amplitude-based auditory artifact detection system. 
 '''
+
 USE_REAL_DEVICE = True
 DEVICE_SERIAL = "UN-2019.02.66"  
 
