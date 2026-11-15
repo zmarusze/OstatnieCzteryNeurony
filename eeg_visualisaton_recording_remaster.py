@@ -1,7 +1,7 @@
 import threading
 import gpype as gp
 from utils import pump_markers
-from mu_processing import MuProcessor
+from mu_calibration import MuProcessor
 print("załadowane")
 
 USE_REAL_DEVICE = True
@@ -119,5 +119,3 @@ if __name__ == "__main__":
         print("(Time samples, Channels, Trials)")
     else:
         print("\nNo epochs were collected (did the specified target marker arrive?)")
-
-.hej

@@ -1,6 +1,7 @@
 import csv
 import math
 from pathlib import Path
+import json
 
 import gpype as gp
 import numpy as np
@@ -18,12 +19,45 @@ C3_CHANNEL = "C3"
 OUTPUT_FILE = Path("outputs") / "mu_features.csv"
 
 FEATURE_NAMES = [
-    "c3_mean_abs", "c3_psd",
-    "mean_channels_mean_abs", "mean_channels_psd",
-    "median_channels_mean_abs", "median_channels_psd",
-    "average_signal_mean_abs", "average_signal_psd",
+    "c3_mean_abs"#, "c3_psd",
+    #"mean_channels_mean_abs", "mean_channels_psd",
+    #"average_signal_mean_abs", "average_signal_psd",
 ]
 
+BINS_FILE = Path("outputs") / "bin_edges.json"
+
+def _band_metrics(signal, fs):  # [ADDED] Extracted standalone helper so neurofeedback script can reuse exact math
+    """Returns (mean_abs, mu_band_psd) along axis 0 for 1D or 2D signals."""
+    mean_abs = np.mean(np.abs(signal), axis=0)
+    freqs, psd = sp.periodogram(
+        signal, fs=fs, window="hann", detrend="constant", scaling="density", axis=0
+    )
+    mask = (freqs >= MU_LOW) & (freqs <= MU_HIGH)
+    band_psd = np.trapz(psd[mask], x=freqs[mask], axis=0)
+    return mean_abs, band_psd
+
+
+def extract_mu_features(window, fs, c3_index):  # [ADDED] Extracted standalone feature calculator
+    """Computes active mu features on an already bandpass-filtered (samples, channels) window."""
+    ch_abs, ch_psd = _band_metrics(window, fs)  # [MODIFIED] Uses standalone _band_metrics
+    # avg_abs, avg_psd = _band_metrics(np.mean(window, axis=1), fs)  # [COMMENTED OUT] Unused while only c3_mean_abs is active
+
+    all_values = {  # [MODIFIED] Mapped by name so commenting out items in FEATURE_NAMES works seamlessly
+        "c3_mean_abs": ch_abs[c3_index],
+        # "c3_psd": ch_psd[c3_index],  # [COMMENTED OUT]
+        # "mean_channels_mean_abs": np.mean(ch_abs),  # [COMMENTED OUT]
+        # "mean_channels_psd": np.mean(ch_psd),  # [COMMENTED OUT]
+        # "median_channels_mean_abs": np.median(ch_abs),  # [COMMENTED OUT]
+        # "median_channels_psd": np.median(ch_psd),  # [COMMENTED OUT]
+        # "average_signal_mean_abs": avg_abs,  # [COMMENTED OUT]
+        # "average_signal_psd": avg_psd,  # [COMMENTED OUT]
+    }
+    return {name: float(all_values[name]) for name in FEATURE_NAMES}  # [MODIFIED] Returns only active FEATURE_NAMES
+
+def assign_bin(edges, value, n_bins=N_BINS):  # [ADDED] Extracted standalone bin lookup helper for neurofeedback script
+    """Maps a scalar feature value to a 1-indexed bin using saved bin edges."""
+    idx = np.searchsorted(np.asarray(edges)[1:-1], value, side="right") + 1
+    return int(np.clip(idx, 1, n_bins))
 
 class MuProcessor(gp.Sink):
     def __init__(
@@ -34,6 +68,7 @@ class MuProcessor(gp.Sink):
         window_seconds=WINDOW_SECONDS,
         pre_trigger_secs=PRE_TRIGGER_SECS,
         output_file=OUTPUT_FILE,
+        bins_file=BINS_FILE,
         **kwargs,
     ):
         kwargs.setdefault(
@@ -48,6 +83,7 @@ class MuProcessor(gp.Sink):
         self.window_seconds = window_seconds
         self.pre_trigger_secs = pre_trigger_secs
         self.output_file = Path(output_file)
+        self.bins_file = Path(bins_file)
 
         self.epochs_received = 0
         self.samples_received = 0
@@ -76,11 +112,7 @@ class MuProcessor(gp.Sink):
         self.output_file.parent.mkdir(parents=True, exist_ok=True)
         self.csv_file = open(self.output_file, "w", newline="")
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(
-            ["Epoch_number", "Epoch_time_seconds", "Calibration"]
-            + FEATURE_NAMES
-            + [f"{name}_bin" for name in FEATURE_NAMES]
-        )
+
         metric_headers = [
             col for name in FEATURE_NAMES for col in (name, f"{name}_bin")
         ]
@@ -96,27 +128,8 @@ class MuProcessor(gp.Sink):
         )
         return super().setup(data, port_context_in)
 
-    def _band_metrics(self, signal):
-        """Returns (mean_abs, mu_band_psd) along axis 0 for 1D or 2D signals."""
-        mean_abs = np.mean(np.abs(signal), axis=0)
-        freqs, psd = sp.periodogram(
-            signal, fs=self.fs, window="hann", detrend="constant", scaling="density", axis=0
-        )
-        mask = (freqs >= MU_LOW) & (freqs <= MU_HIGH)
-        band_psd = np.trapz(psd[mask], x=freqs[mask], axis=0)
-        return mean_abs, band_psd
-
     def calculate_features(self, window):
-        ch_abs, ch_psd = self._band_metrics(window)
-        avg_abs, avg_psd = self._band_metrics(np.mean(window, axis=1))
-
-        values = [
-            ch_abs[self.c3_index], ch_psd[self.c3_index],
-            np.mean(ch_abs), np.mean(ch_psd),
-            np.median(ch_abs), np.median(ch_psd),
-            avg_abs, avg_psd,
-        ]
-        return dict(zip(FEATURE_NAMES, map(float, values)))
+        return extract_mu_features(window, self.fs, self.c3_index)
 
     def calibrate(self):
         print("\nCALIBRATION FINISHED (QUANTILE BINS)")
@@ -133,10 +146,21 @@ class MuProcessor(gp.Sink):
             print(f"\n{name} (min={vals.min():.6f}, max={vals.max():.6f})")
             for i in range(N_BINS):
                 print(f"  Bin {i + 1}: {edges[i]:.6f} - {edges[i + 1]:.6f}")
-        print("\n8-BIN CALIBRATION COMPLETE\n")
+        self.bins_file.parent.mkdir(parents=True, exist_ok=True)  # [ADDED] Ensure output folder exists for bin_edges.json
+        payload = {  # [ADDED] Bundle filter metadata + bin edges for the piano neurofeedback script
+            "n_bins": N_BINS,
+            "mu_low": MU_LOW,
+            "mu_high": MU_HIGH,
+            "filter_order": FILTER_ORDER,
+            "c3_channel": C3_CHANNEL,
+            "bin_edges": {name: edges.tolist() for name, edges in self.bin_edges.items()},
+        }
+        with open(self.bins_file, "w") as f:  # [ADDED] Write calibrated bins to JSON
+            json.dump(payload, f, indent=2)
+
+        print(f"\n8-BIN CALIBRATION COMPLETE (Saved to {self.bins_file})\n")
 
     def get_bin(self, name, value):
-        idx = np.searchsorted(self.bin_edges[name][1:-1], value, side="right") + 1
         return int(np.clip(idx, 1, N_BINS))
 
     def _get_epoch_label(self, epoch_num, is_calibration):
@@ -184,9 +208,8 @@ class MuProcessor(gp.Sink):
             for cell in (f"{features[name]:.6f}", bins[name])
         ]
         self.csv_writer.writerow(
-            [self.epochs_received, self.epochs_received * self.window_seconds, is_calibration]
-            + [features[name] for name in FEATURE_NAMES]
-            + [bins[name] for name in FEATURE_NAMES]
+            [self.epochs_received, label, self.epochs_received * self.window_seconds, is_calibration]
+            + metric_cells
         )
         self.csv_file.flush()
         return {}
@@ -200,4 +223,3 @@ class MuProcessor(gp.Sink):
             f"\nMU PROCESSOR STOPPED\nTotal samples: {self.samples_received}\n"
             f"Total epochs: {self.epochs_received}\nResults saved to: {self.output_file}"
         )
-.
