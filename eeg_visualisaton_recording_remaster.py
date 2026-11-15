@@ -2,9 +2,12 @@ import threading
 import gpype as gp
 from utils import pump_markers
 from mu_processing import MuProcessor
+print("załadowane")
 
-USE_REAL_DEVICE = False
+USE_REAL_DEVICE = True
+print("połączone")
 DEVICE_SERIAL = "UN-2024.12.02"  
+print(DEVICE_SERIAL)
 TEST_SIGNAL = False 
 
 CHANNEL_LABELS = ["Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8"]
@@ -36,13 +39,14 @@ if __name__ == "__main__":
     trigger = gp.Trigger(time_pre=0.1, time_post=4, target=[1,2,3])
     baseline = gp.Baseline()
     collector = gp.Collector()
-   
+    print("załadowane do collectora")
     mu_processor = MuProcessor(
         channel_labels=CHANNEL_LABELS,
         pre_trigger_seconds=0.1,
         window_seconds=4.0,
         calibration_seconds=160.0
     )
+    print("załadowane do mu_processor")
    
     epoch_scope = gp.TriggerScope(
         title="Epoched EEG (All Conditions)"
@@ -59,18 +63,25 @@ if __name__ == "__main__":
         markers=[gp.TimeSeriesScope.Markers(color=color, label=label, channel=N_EEG_CHANNELS, value=code) for code, (label, color) in MARKER_STYLE.items()])
     
     eeg_writer = gp.EDFWriter(file_name=f"outputs/{FILE_PREFIX}_eeg.edf")
-
+    print("załadowane do connections")
     p.connect(source, bandpass)
+    print("załadowane connection do bandpass")
     p.connect(bandpass, notch50)
+    print("załadowane connection do notch50")
     p.connect(notch50, trigger)
+    print("załadowane connection do trigger")
     p.connect(marker, trigger[gp.Trigger.PORT_TRIGGER])
+    print("załadowane connection do trigger marker")
     p.connect(trigger, baseline)
+    print("załadowane connection przed mu_processor")
     p.connect(baseline, mu_processor)
+    print("załadowane connection do mu_processor")
     p.connect(baseline, epoch_scope)
 
     p.connect(notch50, merge_vis["eeg"])
     p.connect(marker, merge_vis["mrk"])
     p.connect(merge_vis, scope)
+    print("po scopeach")
 
     p.connect(notch50, merge_prep["eeg"]) 
     p.connect(marker, merge_prep["mrk"])
@@ -78,9 +89,10 @@ if __name__ == "__main__":
 
     epoch_scope = gp.TriggerScope(title="Epoched EEG (All MI)")
     p.connect(baseline, epoch_scope)
-
+    print("przed widgetami")
     app.add_widget(scope)         
     app.add_widget(epoch_scope)
+    print("po widgetach")
 
 
     p.start()
