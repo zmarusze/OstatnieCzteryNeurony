@@ -19,7 +19,7 @@ subprocess.check_call([
 
 >>>>>>> ac8e3f4efecfbda472ed201a2d441ee4be047411
 subprocess.check_call(
-    [sys.executable, "-m", "pip", "install", "--upgrade", "mne", "gpype[all]", "gpype[devices]"]
+    [sys.executable, "-m", "pip", "install", "--upgrade", "mne", "gpype[all]", "gpype[devices]", "pygame", "mido"]
 )
 print("Done! All dependencies are installed.")
 
